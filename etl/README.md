@@ -8,6 +8,6 @@ Daily scripts that pull public data and render artifact pages.
 
 `render.py <name>` injects `data/<name>.json` into `etl/templates/<name>.html` and writes `artifacts/<name>.html`, the page that gets published as the artifact.
 
-`.github/workflows/etl-daily.yml` runs both daily and commits changes. Add a `BLS_API_KEY` repo secret (free at https://data.bls.gov/registrationEngine/) for higher API limits.
+A daily Claude Code Routine runs both, commits changes and republishes the artifact at https://claude.ai/artifact/1kc7BQ15sx9YVH6EJg5kM5. `.github/workflows/etl-daily.yml` is a manual fallback. Add a `BLS_API_KEY` repo secret (free at https://data.bls.gov/registrationEngine/) for higher API limits.
 
 Adding a new feed: write `etl/<name>.py` that writes `data/<name>.json`, add a template, and add a job to the workflow.

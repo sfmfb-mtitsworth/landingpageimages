@@ -1,13 +1,9 @@
 name: Daily ETL
 
+# Manual fallback only. The daily run happens in a scheduled Claude Code Routine,
+# which also republishes the artifact.
 on:
-  schedule:
-    - cron: "17 13 * * *" # 13:17 UTC daily, after BLS's 8:30 ET release time
   workflow_dispatch:
-  push:
-    paths:
-      - "etl/**"
-      - ".github/workflows/etl-daily.yml"
 
 permissions:
   contents: write
