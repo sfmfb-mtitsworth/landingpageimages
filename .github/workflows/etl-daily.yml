@@ -1,0 +1,39 @@
+name: Daily ETL
+
+on:
+  schedule:
+    - cron: "17 13 * * *" # 13:17 UTC daily, after BLS's 8:30 ET release time
+  workflow_dispatch:
+  push:
+    paths:
+      - "etl/**"
+      - ".github/workflows/etl-daily.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cpi-national:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Extract CPI from BLS
+        env:
+          BLS_API_KEY: ${{ secrets.BLS_API_KEY }}
+        run: python etl/cpi_national.py
+      - name: Render artifact page
+        run: python etl/render.py cpi_national
+      - name: Commit if changed
+        run: |
+          git config user.name "etl-bot"
+          git config user.email "etl-bot@users.noreply.github.com"
+          git add data/cpi_national.json artifacts/cpi_national.html
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "ETL: refresh national CPI data"
+            git push
+          fi

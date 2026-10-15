@@ -1,0 +1,242 @@
+<title>National CPI Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; summary tiles, then two charts, then the monthly table. */
+:root {
+  --bg: #f7f8f9; --surface: #ffffff; --ink: #14202b; --ink-2: #4d5965; --ink-3: #7b8692;
+  --rule: #dfe4e8; --grid: #eceff2;
+  --s1: #2a78d6; --s2: #eb6834; --up: #b8461c; --down: #1a7f55;
+  --display: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --body: "Public Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12171c; --surface: #1a2026; --ink: #eef1f3; --ink-2: #b3bcc4; --ink-3: #85909a;
+  --rule: #2c353d; --grid: #242c33; --s1: #3987e5; --s2: #d95926; --up: #e8875f; --down: #4fc293;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12171c; --surface: #1a2026; --ink: #eef1f3; --ink-2: #b3bcc4; --ink-3: #85909a;
+  --rule: #2c353d; --grid: #242c33; --s1: #3987e5; --s2: #d95926; --up: #e8875f; --down: #4fc293;
+  color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.5 }
+.wrap { max-width: 960px; margin: 0 auto; padding-block: 32px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px }
+header { display: grid; gap: 6px }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3) }
+h1 { font: 700 clamp(26px, 4vw, 34px)/1.15 var(--display); margin: 0; text-wrap: balance }
+h2 { font: 600 17px/1.3 var(--display); margin: 0; text-wrap: balance }
+.meta { color: var(--ink-2); font-size: 14px; margin: 0; max-width: 65ch }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px }
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0 }
+.tile .label { font-size: 13px; color: var(--ink-2) }
+.tile .value { font: 500 28px/1.1 var(--mono); font-variant-numeric: tabular-nums }
+.tile .delta { font-size: 13px; color: var(--ink-3) }
+.delta .up { color: var(--up) } .delta .down { color: var(--down) }
+section.panel { display: grid; gap: 10px; min-width: 0 }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px }
+.legend { display: flex; gap: 16px; font-size: 13px; color: var(--ink-2) }
+.legend span { display: inline-flex; align-items: center; gap: 6px }
+.legend i { width: 14px; height: 2px; border-radius: 1px; display: inline-block }
+.ranges { display: flex; gap: 4px }
+.ranges button { font: 500 12px/1 var(--mono); padding: 6px 10px; border: 1px solid var(--rule); background: var(--surface); color: var(--ink-2); border-radius: 4px; cursor: pointer }
+.ranges button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+.ranges button:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px }
+.chart { position: relative; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 4px 4px }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible }
+.chart text { fill: var(--ink-3); font: 11px var(--mono) }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font: 12px/1.45 var(--mono); padding: 6px 8px; border-radius: 4px; white-space: nowrap; transform: translate(-50%, -100%) }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px }
+table { border-collapse: collapse; width: 100%; font-size: 14px }
+th, td { padding: 8px 14px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap }
+th:first-child, td:first-child { text-align: left }
+th { font-weight: 600; color: var(--ink-2); font-size: 12px }
+tr:last-child td { border-bottom: 0 }
+footer { font-size: 12px; color: var(--ink-3); display: grid; gap: 4px }
+footer a { color: var(--ink-2) }
+.empty { padding: 32px; text-align: center; color: var(--ink-2) }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">CPI-U · U.S. city average</div>
+    <h1>National Consumer Price Index</h1>
+    <p class="meta" id="asof"></p>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>12-month change, %</h2>
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>All items</span>
+        <span><i style="background:var(--s2)"></i>Core (less food &amp; energy)</span>
+      </div>
+      <div class="ranges" role="group" aria-label="Time range">
+        <button type="button" id="r2" data-years="2">2Y</button>
+        <button type="button" id="r5" data-years="5">5Y</button>
+        <button type="button" id="rall" data-years="0">All</button>
+      </div>
+    </div>
+    <div class="chart" id="yoy"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>1-month change, seasonally adjusted, %</h2>
+      <span class="meta">Last 24 months</span>
+    </div>
+    <div class="chart" id="mom"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Last 12 months</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Month</th><th>Index (NSA)</th><th>12-mo %</th><th>Core 12-mo %</th><th>1-mo % (SA)</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </section>
+
+  <footer>
+    <span id="src"></span>
+    <span>Index base 1982–84 = 100. 12-month changes use not seasonally adjusted data; 1-month changes use seasonally adjusted data.</span>
+    <a href="https://www.bls.gov/cpi/" target="_blank" rel="noopener">BLS CPI home</a>
+  </footer>
+</div>
+
+<script>
+const DATA = /*__CPI_DATA__*/null;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const label = m => { const [y, mo] = m.split("-"); return `${MONTHS[+mo - 1]} ${y}`; };
+const fmt = (v, d = 1, sign = false) => v == null ? "–" : (sign && v > 0 ? "+" : "") + v.toFixed(d);
+const NS = "http://www.w3.org/2000/svg";
+const el = (tag, attrs = {}, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); parent && parent.appendChild(n); return n; };
+
+function niceTicks(lo, hi, n = 5) {
+  const span = hi - lo || 1, raw = span / n, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => span / s <= n) || mag * 10;
+  const ticks = []; for (let t = Math.floor(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(+t.toFixed(6));
+  return ticks;
+}
+
+function tooltip(box) { const t = document.createElement("div"); t.className = "tip"; t.hidden = true; box.appendChild(t); return t; }
+
+function lineChart(box, rows) {
+  box.innerHTML = "";
+  const W = 900, H = 300, m = { l: 40, r: 16, t: 14, b: 28 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "12-month percent change, all items and core" }, box);
+  const vals = rows.flatMap(r => [r.yoy, r.core_yoy]).filter(v => v != null);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(...vals));
+  const lo = ticks[0], hi = ticks[ticks.length - 1];
+  const x = i => m.l + (i / Math.max(1, rows.length - 1)) * (W - m.l - m.r);
+  const y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+  ticks.forEach(t => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? "var(--ink-3)" : "var(--grid)", "stroke-width": 1 }, svg);
+    el("text", { x: m.l - 6, y: y(t) + 4, "text-anchor": "end" }, svg).textContent = t;
+  });
+  const every = Math.ceil(rows.length / 8);
+  rows.forEach((r, i) => { if (r.month.endsWith("-01") && (i % every < 12 || rows.length <= 36)) {
+    el("text", { x: x(i), y: H - 8, "text-anchor": "middle" }, svg).textContent = r.month.slice(0, 4);
+  }});
+  [["yoy", "var(--s1)"], ["core_yoy", "var(--s2)"]].forEach(([k, c]) => {
+    let d = ""; rows.forEach((r, i) => { if (r[k] != null) d += (d ? "L" : "M") + x(i).toFixed(1) + "," + y(r[k]).toFixed(1); });
+    el("path", { d, fill: "none", stroke: c, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    const li = rows.length - 1;
+    if (rows[li][k] != null) el("circle", { cx: x(li), cy: y(rows[li][k]), r: 4, fill: c, stroke: "var(--surface)", "stroke-width": 2 }, svg);
+  });
+  const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--ink-3)", "stroke-dasharray": "3 3", visibility: "hidden" }, svg);
+  const tip = tooltip(box);
+  const hit = el("rect", { x: m.l, y: 0, width: W - m.l - m.r, height: H, fill: "transparent" }, svg);
+  const move = e => {
+    const p = svg.getBoundingClientRect(), sx = (e.clientX - p.left) * W / p.width;
+    const i = Math.max(0, Math.min(rows.length - 1, Math.round((sx - m.l) / (W - m.l - m.r) * (rows.length - 1))));
+    const r = rows[i];
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i)); cross.setAttribute("visibility", "visible");
+    tip.hidden = false;
+    tip.innerHTML = `${label(r.month)}<br>All items ${fmt(r.yoy)}%<br>Core ${fmt(r.core_yoy)}%`;
+    tip.style.left = Math.min(Math.max(x(i) * p.width / W, 70), p.width - 70) + "px";
+    tip.style.top = "12px";
+  };
+  hit.addEventListener("pointermove", move);
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+}
+
+function barChart(box, rows) {
+  box.innerHTML = "";
+  const W = 900, H = 220, m = { l: 40, r: 16, t: 14, b: 28 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "1-month percent change, seasonally adjusted" }, box);
+  const vals = rows.map(r => r.mom).filter(v => v != null);
+  const ticks = niceTicks(Math.min(0, ...vals), Math.max(0, ...vals), 4);
+  const lo = ticks[0], hi = ticks[ticks.length - 1];
+  const y = v => m.t + (1 - (v - lo) / (hi - lo)) * (H - m.t - m.b);
+  const bw = (W - m.l - m.r) / rows.length;
+  ticks.forEach(t => {
+    el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), stroke: t === 0 ? "var(--ink-3)" : "var(--grid)" }, svg);
+    el("text", { x: m.l - 6, y: y(t) + 4, "text-anchor": "end" }, svg).textContent = t;
+  });
+  const tip = tooltip(box);
+  rows.forEach((r, i) => {
+    const bx = m.l + i * bw;
+    if (r.month.endsWith("-01") || i === 0) el("text", { x: bx + bw / 2, y: H - 8, "text-anchor": "middle" }, svg).textContent = label(r.month);
+    if (r.mom == null) return;
+    const top = Math.min(y(r.mom), y(0)), h = Math.max(1, Math.abs(y(r.mom) - y(0)));
+    const bar = el("rect", { x: bx + 2, y: top, width: Math.max(1, bw - 4), height: h, rx: 2, fill: "var(--s1)", opacity: i === rows.length - 1 ? 1 : .7 }, svg);
+    const hit = el("rect", { x: bx, y: m.t, width: bw, height: H - m.t - m.b, fill: "transparent" }, svg);
+    hit.addEventListener("pointerenter", () => {
+      const p = svg.getBoundingClientRect();
+      bar.setAttribute("opacity", 1); tip.hidden = false;
+      tip.textContent = `${label(r.month)}: ${fmt(r.mom, 1, true)}%`;
+      tip.style.left = Math.min(Math.max((bx + bw / 2) * p.width / W, 60), p.width - 60) + "px";
+      tip.style.top = Math.max(0, top * p.height / H) + "px";
+    });
+    hit.addEventListener("pointerleave", () => { bar.setAttribute("opacity", i === rows.length - 1 ? 1 : .7); tip.hidden = true; });
+  });
+}
+
+function render() {
+  if (!DATA || !DATA.rows || !DATA.rows.length) {
+    document.querySelector(".wrap").insertAdjacentHTML("beforeend", '<div class="empty">No CPI data yet. The daily ETL fills this page after its first run.</div>');
+    return;
+  }
+  const rows = DATA.rows, last = rows[rows.length - 1], prev = rows[rows.length - 2] || {};
+  document.getElementById("asof").textContent =
+    `Latest release covers ${label(last.month)}. Data refreshed ${new Date(DATA.fetched_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}.`;
+  document.getElementById("src").textContent = `Source: ${DATA.source} (series ${Object.keys(DATA.series).join(", ")}).`;
+
+  const delta = (cur, before, unit) => {
+    if (cur == null || before == null) return "";
+    const d = cur - before, cls = d > 0 ? "up" : d < 0 ? "down" : "";
+    return `<span class="${cls}">${d > 0 ? "▲" : d < 0 ? "▼" : "■"} ${fmt(Math.abs(d), unit === "pt" ? 1 : 2)}${unit === "pt" ? " pt" : ""}</span> vs ${label(prev.month).split(" ")[0]}`;
+  };
+  const tiles = [
+    ["All items, 12-mo", fmt(last.yoy) + "%", delta(last.yoy, prev.yoy, "pt")],
+    ["Core, 12-mo", fmt(last.core_yoy) + "%", delta(last.core_yoy, prev.core_yoy, "pt")],
+    ["All items, 1-mo (SA)", fmt(last.mom, 1, true) + "%", delta(last.mom, prev.mom, "pt")],
+    ["Index level (NSA)", fmt(last.headline_nsa, 1), delta(last.headline_nsa, prev.headline_nsa, "idx")],
+  ];
+  document.getElementById("tiles").innerHTML = tiles.map(([l, v, d]) =>
+    `<div class="tile"><span class="label">${l}</span><span class="value">${v}</span><span class="delta">${d || "&nbsp;"}</span></div>`).join("");
+
+  const yoyRows = rows.filter(r => r.yoy != null);
+  const buttons = [...document.querySelectorAll(".ranges button")];
+  const setRange = years => {
+    buttons.forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.years === years)));
+    lineChart(document.getElementById("yoy"), years ? yoyRows.slice(-years * 12) : yoyRows);
+    try { localStorage.setItem("cpi-range", years); } catch (e) {}
+  };
+  buttons.forEach(b => b.addEventListener("click", () => setRange(+b.dataset.years)));
+  let saved = 5; try { const s = localStorage.getItem("cpi-range"); if (s !== null) saved = +s; } catch (e) {}
+  setRange([0, 2, 5].includes(saved) ? saved : 5);
+
+  barChart(document.getElementById("mom"), rows.slice(-24));
+
+  document.getElementById("rows").innerHTML = rows.slice(-12).reverse().map(r =>
+    `<tr><td>${label(r.month)}</td><td class="num">${fmt(r.headline_nsa, 3)}</td><td class="num">${fmt(r.yoy)}</td><td class="num">${fmt(r.core_yoy)}</td><td class="num">${fmt(r.mom, 1, true)}</td></tr>`).join("");
+}
+render();
+</script>
